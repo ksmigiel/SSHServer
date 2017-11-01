@@ -30,6 +30,7 @@ namespace SSHServer
             });
             services.AddSingleton<AppConfiguration>(appConfiguration);
             services.AddTransient<Server>();
+            services.AddTransient<ClientFactory>();
 
             var container = services.BuildServiceProvider();
 

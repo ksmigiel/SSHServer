@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using Microsoft.Extensions.Configuration;
@@ -10,12 +11,15 @@ namespace SSHServer
     {
         private readonly IConfigurationRoot _configuration;
         private readonly ILogger _logger;
+        private readonly ClientFactory _clientFactory;
+        private readonly List<Client> _clients = new List<Client>();
         private TcpListener _listener;
 
-        public Server(ILoggerFactory loggerFactory, AppConfiguration configuration)
+        public Server(ILoggerFactory loggerFactory, AppConfiguration configuration, ClientFactory clientFactory)
         {
             _configuration = configuration.Configuration;
             _logger = loggerFactory.CreateLogger<Server>();
+            _clientFactory = clientFactory;
         }
 
         public void Start()
@@ -36,9 +40,13 @@ namespace SSHServer
         {
             while (_listener.Pending())
             {
-                var acceptSocket = _listener.AcceptSocket();
-                
-                _logger.LogDebug($"New client connected: {acceptSocket.RemoteEndPoint.ToString()}");
+                var socket = _listener.AcceptSocket();
+
+                _logger.LogDebug($"New client connected: {socket.RemoteEndPoint.ToString()}");
+
+                _clients.Add(_clientFactory.CreateClient(socket));
+                _clients.ForEach(c => c.Poll());
+                _clients.RemoveAll(c => !c.IsConnected);
             }
         }
 
@@ -48,9 +56,12 @@ namespace SSHServer
             {
                 _logger.LogInformation("Shutting down...");
 
+                _clients.ForEach(c => c.Disconnect());
+                _clients.Clear();
+
                 _listener.Stop();
                 _listener = null;
-                
+
                 _logger.LogInformation("Stopped!");
             }
         }
